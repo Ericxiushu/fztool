@@ -130,7 +130,7 @@ func checkTypeTemp(t []byte, fieldName []byte) []byte {
 				res = Int64
 			}
 		}
-	case "float":
+	case "float", "decimal":
 		res = Float64
 
 	}
@@ -145,41 +145,42 @@ func writeInFileTemp(structList []FormStruct) {
 
 	for _, v := range structList {
 
-		structContent = fmt.Sprintf("// %s %s\ntype %s struct{ \n", v.StructName, v.StructName, v.StructName)
+		structContent += fmt.Sprintf("// %s %s\ntype %s struct{ \n", v.StructName, v.StructName, v.StructName)
 
 		for _, v1 := range v.Fields {
-			structContent += fmt.Sprintf("    %s %s `json:\"%s\"`\n", v1.Name, v1.Type, v1.OriName)
+			structContent += fmt.Sprintf("    %s %s `json:\"%s\" xorm:\"%s\"`\n", v1.Name, v1.Type, formatNames2(bytes.Replace(v1.OriName, []byte("_"), []byte(" "), -1)), v1.OriName)
 		}
 
-		structContent += "}"
+		structContent += "}\n\n"
 
 		content = strings.Replace(sqlFormtField, "$structContent", structContent, -1)
 		content = strings.Replace(content, "$structName", string(v.StructName), -1)
 		content = strings.Replace(content, "$tableName", string(v.TableName), -1)
 
-		fileName := fmt.Sprintf("./%s/%s.go", childDir, bytes.ToLower(v.StructName))
+	}
 
-		dirErr := os.MkdirAll(childDir, 0777)
+	fileName := fmt.Sprintf("./%s/dbStruct.go", childDir)
 
-		if dirErr != nil {
-			fmt.Println("mkdir error :" + dirErr.Error())
-			return
-		}
+	dirErr := os.MkdirAll(childDir, 0777)
 
-		dstFile, err := os.Create(fileName)
-		if err != nil {
-			fmt.Println(" create file error :" + err.Error())
-			return
-		}
-		defer dstFile.Close()
-		i, e := dstFile.WriteString(content + "\n")
+	if dirErr != nil {
+		fmt.Println("mkdir error :" + dirErr.Error())
+		return
+	}
 
-		if e != nil {
-			fmt.Printf("ERROR: %s, struct: %s, %d\n", e.Error(), v.StructName, i)
-		} else {
-			fmt.Printf("SUCCESS: struct: %s,%d\n", v.StructName, i)
+	dstFile, err := os.Create(fileName)
+	if err != nil {
+		fmt.Println(" create file error :" + err.Error())
+		return
+	}
+	defer dstFile.Close()
+	i, e := dstFile.WriteString(content + "\n")
 
-		}
+	if e != nil {
+		fmt.Printf("ERROR: %s, %d\n", e.Error(), i)
+	} else {
+		fmt.Printf("SUCCESS: %d\n", i)
+
 	}
 
 }
@@ -192,6 +193,19 @@ func formatNames(a []byte) []byte {
 		if specialWords[strings.ToLower(v)] {
 			list[k] = strings.ToUpper(v)
 		} else {
+			list[k] = strings.Title(v)
+		}
+	}
+
+	return []byte(strings.Join(list, ""))
+}
+
+func formatNames2(a []byte) []byte {
+
+	list := strings.Split(string(a), " ")
+
+	for k, v := range list {
+		if k > 0 {
 			list[k] = strings.Title(v)
 		}
 	}
